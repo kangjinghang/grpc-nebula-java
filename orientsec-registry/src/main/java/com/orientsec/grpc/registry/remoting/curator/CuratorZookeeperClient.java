@@ -187,6 +187,9 @@ public class CuratorZookeeperClient extends AbstractZookeeperClient<CuratorWatch
     try {
       client.create().withMode(CreateMode.EPHEMERAL).forPath(path);
     } catch (KeeperException.NodeExistsException e) {
+      // 已存在的节点可能是即将过期的节点，删除并重建该节点
+      delete(path);
+      createEphemeral(path);
     } catch (Exception e) {
       throw new IllegalStateException(e.getMessage(), e);
     }
@@ -257,12 +260,11 @@ public class CuratorZookeeperClient extends AbstractZookeeperClient<CuratorWatch
     public void process(WatchedEvent event) throws Exception {
       String path = event.getPath();
       if (StringUtils.isEmpty(path)) {
-        logger.info("Ignore this event(" + event + ").");
         return;
       }
 
       if (listener != null) {
-        listener.childChanged(path, client.getChildren().usingWatcher(this).forPath(event.getPath()));
+        listener.childChanged(path, client.getChildren().usingWatcher(this).forPath(path));
       }
     }
   }
