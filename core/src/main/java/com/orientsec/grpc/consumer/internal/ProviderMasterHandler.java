@@ -59,6 +59,9 @@ public class ProviderMasterHandler {
    */
   private Map<String, Boolean> providerUpdatedMap = new HashMap<>();
 
+  // 记录更新后的值
+  Map<String, Boolean> providerNewValueMap;
+
   public ProviderMasterHandler(ZookeeperNameResolver zkNameResolver) {
     this.zkNameResolver = zkNameResolver;
   }
@@ -70,6 +73,8 @@ public class ProviderMasterHandler {
 
     Set<String> providerIdSet = new HashSet<>(MapUtils.capacity(allProviders.size()));
     Set<Integer> providerPortSet = new HashSet<>(MapUtils.capacity(allProviders.size()));
+
+    providerNewValueMap = new HashMap<>();
 
     String providerIp, id;
     int port;
@@ -144,6 +149,7 @@ public class ProviderMasterHandler {
 
               providerKey = providerIp + ":" + port;
               providerUpdatedMap.put(providerKey, true);
+              providerNewValueMap.put(providerKey, masterTemp);
 
               logger.info("监听到[" + serviceName + "]服务实例[" + providerKey
                       + "]的[master]配置项，参数值为[" + masterTemp + "]");
@@ -180,7 +186,19 @@ public class ProviderMasterHandler {
       }
     }
 
+    // 备->主的配置变化不会引起服务提供者重选
+    boolean needReselect = false;
     if (isUpdate) {
+      for (Map.Entry<String, Boolean> entry : providerNewValueMap.entrySet()) {
+        if (!entry.getValue()) {
+          // 该provider的新master参数值为false，即 主->备
+          needReselect = true;
+          break;
+        }
+      }
+    }
+
+    if (isUpdate && needReselect) {
       // 主动触发客户端重新更新服务端列表，并重新选择服务提供者
       Object lock = zkNameResolver.getLock();
       synchronized (lock) {
@@ -266,6 +284,9 @@ public class ProviderMasterHandler {
       masterObj = String.valueOf(GlobalConstants.Provider.DEFAULT_MASTER);
     }
     boolean master = Boolean.valueOf(masterObj.toString());
+    if (provider.getMaster() != master) {
+      providerNewValueMap.put(providerKey, master);
+    }
 
     provider.setMaster(master);
     ProvidersConfigUtils.updateProperty(serviceName, providerIp, port, KEY, master);

@@ -1107,4 +1107,9 @@ public class Constants {
    */
   public static final int DEFAULT_ZOOKEEPER_PORT = 2181;
 
+  /**
+   * 参数路由，用户自定义提示语
+   */
+  public static final String MESSAGE = "message";
+
 }

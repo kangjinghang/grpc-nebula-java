@@ -33,7 +33,10 @@ dependencies {
         // prefer 20.0 from libraries instead of 19.0
         exclude group: 'com.google.guava', module: 'guava'
     }
-
+    //表达式计算框架，aviator
+    compile ("com.googlecode.aviator:aviator:4.2.10") {
+        exclude group: 'commons-logging', module: 'commons-logging'
+    }
     testCompile project(':orientsec-grpc-context').sourceSets.test.output,
             project(':orientsec-grpc-testing'),
             project(':orientsec-grpc-grpclb'),

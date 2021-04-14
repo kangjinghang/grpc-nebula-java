@@ -29,6 +29,7 @@ import com.orientsec.grpc.common.enums.LoadBalanceMode;
 import com.orientsec.grpc.common.resource.SystemConfig;
 import com.orientsec.grpc.common.util.*;
 import com.orientsec.grpc.consumer.ConsistentHashArguments;
+import com.orientsec.grpc.consumer.ParameterRouterUtil;
 import com.orientsec.grpc.consumer.ThreadLocalVariableUtils;
 import com.orientsec.grpc.consumer.core.ConsumerServiceRegistry;
 import com.orientsec.grpc.consumer.core.ConsumerServiceRegistryFactory;
@@ -215,6 +216,9 @@ public final class ManagedChannelImpl extends ManagedChannel implements
 
   private static final ClientTransport NO_PROVIDER_TRANSPORT =
           new FailingClientTransport(Status.UNAVAILABLE.withDescription("注册中心上没有当前客户端调用的服务，请检查调用的服务接口名称是否正确！"), ClientStreamListener.RpcProgress.REFUSED);
+
+  private static final ClientTransport BLOCKED_BY_PARAM_ROUTER_TRANSPORT =
+      new FailingClientTransport(Status.CANCELLED.withDescription("该服务由于参数路由限制，无可用提供者，取消本次调用！"), ClientStreamListener.RpcProgress.REFUSED);
 
   // Shutdown states.
   //
@@ -525,25 +529,45 @@ public final class ManagedChannelImpl extends ManagedChannel implements
         syncContext.execute(new ExitIdleModeForTransport());
         return delayedTransport;
       } else {
-        //----begin----请求负载均衡----
-
-        // 如果负载均衡模式为“请求负载均衡”，每次都触发负载均衡算法
         lbMode = getloadBalanceMode(nameResolver);
-        if (LoadBalanceMode.request.name().equals(lbMode)) {
-          String method = getMethod(nameResolver);
-          nameResolver.resolveServerInfo(argument, method);
-          pickerCopy = subchannelPicker;// 切换服务器会导致subchannelPicker发生变化
-        } else {
+        boolean connectionOutOfTime = false;
+        if (LoadBalanceMode.connection.name().equals(lbMode)) {
           if (lastSwitchConnMillisecond == 0) {
             lastSwitchConnMillisecond = System.currentTimeMillis();
           } else {
             long currentTimeMillis = System.currentTimeMillis();
             if (currentTimeMillis - lastSwitchConnMillisecond >= configSwitchConnMillisecond) {
+              connectionOutOfTime = true;
               lastSwitchConnMillisecond = currentTimeMillis;
-              String method = getMethod(nameResolver);
-              nameResolver.resolveServerInfo(argument, method);
-              pickerCopy = subchannelPicker;// 切换服务器会导致subchannelPicker发生变化
+              nameResolver.getLastProviderMapAfterParamRoute().clear();
             }
+          }
+        }
+
+        //----begin----参数路由重选提供者----
+
+        String method = getMethod(nameResolver);
+        boolean isParameterRouterResolved = reselectServerByRouter(method, args.getCallOptions());
+        if (isParameterRouterResolved &&
+            nameResolver.getServiceProviderMap() != null && nameResolver.getServiceProviderMap().isEmpty()) {
+          return BLOCKED_BY_PARAM_ROUTER_TRANSPORT;
+        }
+        //----end----参数路由重选提供者----
+
+        //----begin----请求负载均衡----
+
+        // 如果负载均衡模式为“请求负载均衡”，每次都触发负载均衡算法 如果已经由参数路由选择过提供者，则不触发
+        if (LoadBalanceMode.request.name().equals(lbMode)) {
+          if (!isParameterRouterResolved) {
+            nameResolver.resolveServerInfo(argument, method);
+          }
+          pickerCopy = subchannelPicker;// 切换服务器会导致subchannelPicker发生变化
+        } else {
+          if (connectionOutOfTime) {
+            if (!isParameterRouterResolved) {
+              nameResolver.resolveServerInfo(argument, method);
+            }
+            pickerCopy = subchannelPicker;// 切换服务器会导致subchannelPicker发生变化
           }
         }
 
@@ -683,6 +707,30 @@ public final class ManagedChannelImpl extends ManagedChannel implements
       }
 
       return transport;
+    }
+
+    /**
+     * 依据参数路由重选服务提供者
+     * 被筛选的服务提供者列表为ZookeeperNameResolver中的ProviderMap
+     *
+     * @since nebula-1.2.8 2020-12-07
+     * @author zhuyujie
+     */
+    private boolean reselectServerByRouter(String method, CallOptions callOptions) {
+      Map<String, Object> routerMap = callOptions.getOption(GrpcUtil.ROUTER_MAP_KEY);
+      if (!ParameterRouterUtil.isEnabled()) {
+        if (routerMap != null) {
+          logger.info("未开启参数路由功能，本次调用的参数路由将不会生效！");
+        }
+        return false;
+      }
+
+      if (routerMap == null) {
+        routerMap = new HashMap<>();
+      }
+      routerMap.put("method", method);
+      // 重新选择服务提供者
+      return nameResolver.reselectProviderByParameterRouter(routerMap, method, getArgument());
     }
 
     @Override

@@ -20,12 +20,15 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 import io.grpc.CallCredentials;
 import io.grpc.CallOptions;
+import io.grpc.internal.GrpcUtil;
 import io.grpc.Channel;
 import io.grpc.ClientInterceptor;
 import io.grpc.ClientInterceptors;
 import io.grpc.Deadline;
 import io.grpc.ExperimentalApi;
 import io.grpc.ManagedChannelBuilder;
+
+import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.CheckReturnValue;
@@ -174,6 +177,17 @@ public abstract class AbstractStub<S extends AbstractStub<S>> {
   @ExperimentalApi("https://github.com/grpc/grpc-java/issues/1869")
   public final <T> S withOption(CallOptions.Key<T> key, T value) {
     return build(channel, callOptions.withOption(key, value));
+  }
+
+  /**
+   * 可在stub中附带[参数路由]组成的Map。例如：key = employeeNumber, value = A9001.
+   *
+   * @since nebula-1.2.8 2020-07-09
+   * @author zhuyujie
+   * @param map the router map
+   */
+  public final S withRouterMap(Map<String, Object> map) {
+    return build(channel, callOptions.withOption(GrpcUtil.ROUTER_MAP_KEY, map));
   }
 
   /**

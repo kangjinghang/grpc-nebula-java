@@ -64,6 +64,11 @@ public class RegistryConstants {
   public static final String ROUTER_PROTOCOL = "route";
 
   /**
+   * 一条路由规则
+   */
+  public static final String PARAMETER_ROUTER_PROTOCOL = "param";
+
+  /**
    * 配置信息集合
    */
   public static final String CONFIGURATORS_CATEGORY = "configurators";
@@ -84,6 +89,11 @@ public class RegistryConstants {
   public static final String DYNAMIC_KEY = "dynamic";
 
   /**
+   * 是否启用
+   */
+  public static final String ENABLED_KEY = "enabled";
+
+  /**
    * 匹配任何主机IP
    */
   public static final String ANYHOST_VALUE = "0.0.0.0";
@@ -96,5 +106,7 @@ public class RegistryConstants {
   public static final String CLIENT_REGISTRY_THREAD_NAME = "client-registry-handler";
 
   public static final String SERVER_REGISTRY_THREAD_NAME = "server-registry-handler";
+
+  public static final String CONFIGURATION_REGISTRY_THREAD_NAME = "configuration-registry-handler";
 
 }

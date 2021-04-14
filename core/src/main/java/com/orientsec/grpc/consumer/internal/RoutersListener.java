@@ -21,13 +21,14 @@ package com.orientsec.grpc.consumer.internal;
 import com.orientsec.grpc.common.constant.RegistryConstants;
 import com.orientsec.grpc.consumer.model.ServiceProvider;
 import com.orientsec.grpc.consumer.routers.ConditionRouter;
+import com.orientsec.grpc.consumer.routers.ParameterRouter;
 import com.orientsec.grpc.consumer.routers.Router;
 import com.orientsec.grpc.consumer.watch.ConsumerListener;
 import com.orientsec.grpc.registry.common.URL;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -39,7 +40,10 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class RoutersListener extends  AbstractListener implements ConsumerListener {
 
+  private static final Logger logger = LoggerFactory.getLogger(RoutersListener.class);
+
   private boolean initData;
+
   public RoutersListener(){
       initData = true;
   }
@@ -47,13 +51,30 @@ public class RoutersListener extends  AbstractListener implements ConsumerListen
   @Override
   public void notify(List<URL> urls) {
     List<Router> routes = new ArrayList<Router>();
+    List<ParameterRouter> parameterRouterList = new ArrayList<>();
     for (URL url : urls) {
-      if (!RegistryConstants.ROUTER_PROTOCOL.equalsIgnoreCase(url.getProtocol())) {
-        continue;
+      if (RegistryConstants.PARAMETER_ROUTER_PROTOCOL.equalsIgnoreCase(url.getProtocol())) {
+        ParameterRouter router;
+        try {
+          router = new ParameterRouter(url);
+        } catch (Exception e) {
+          logger.info("监听到错误的参数路由表达式，自动跳过。url为[" + url + "]", e);
+          continue;
+        }
+        parameterRouterList.add(router);
+      } else if (RegistryConstants.ROUTER_PROTOCOL.equalsIgnoreCase(url.getProtocol())) {
+        Router router = new ConditionRouter(url);
+        routes.add(router);
       }
-      Router router = new ConditionRouter(url);
-      routes.add(router);
     }
+    updateParameterRouterRule(parameterRouterList);
+
+    // 仅有参数路由规则的更新不会触发服务端列表更新
+    List<Router> lastRoutes = zookeeperNameResolver.getRoutes();
+    if (lastRoutes.containsAll(routes) && routes.containsAll(lastRoutes)) {
+      return;
+    }
+
     Collections.sort(routes);
     zookeeperNameResolver.getRoutes().clear();
     zookeeperNameResolver.setRoutes(routes);
@@ -74,5 +95,12 @@ public class RoutersListener extends  AbstractListener implements ConsumerListen
       zookeeperNameResolver.resolveServerInfoWithLock();
     }
     initData = false;
+  }
+
+  private void updateParameterRouterRule(List<ParameterRouter> parameterRouterList) {
+    List<ParameterRouter> routers = zookeeperNameResolver.getParameterRouters();
+    routers.clear();
+    Collections.sort(parameterRouterList);
+    zookeeperNameResolver.setParameterRouters(parameterRouterList);
   }
 }

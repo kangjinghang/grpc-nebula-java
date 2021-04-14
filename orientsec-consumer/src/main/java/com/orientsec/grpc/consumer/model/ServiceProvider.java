@@ -35,7 +35,7 @@ public class ServiceProvider {
   private int timeout = 1000;
   private int reties = 2;
   private int connections = 0;
-  private GlobalConstants.LB_STRATEGY loadblance = GlobalConstants.LB_STRATEGY.ROUND_ROBIN;
+  private GlobalConstants.LB_STRATEGY loadblance = GlobalConstants.LB_STRATEGY.PICK_FIRST;
   private boolean async = false;
   private String token;
   private boolean deprecated = false;
@@ -86,7 +86,7 @@ public class ServiceProvider {
     this.deprecated = false;
     this.dynamic = false;
     this.reties = 2;
-    this.loadblance = GlobalConstants.LB_STRATEGY.ROUND_ROBIN;
+    this.loadblance = GlobalConstants.LB_STRATEGY.PICK_FIRST;
     this.timeout = 1000;
     this.weight = 100;
     this.side = RegistryConstants.PROVIDER_SIDE;

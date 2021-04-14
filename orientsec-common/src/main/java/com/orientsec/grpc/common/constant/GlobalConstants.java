@@ -220,6 +220,11 @@ public class GlobalConstants {
   public static final String COMMON_OWNER = "common.owner";
 
   /**
+   * 配置文件中的运作主管的key值
+   */
+  public static final String COMMON_OPERATION_MANAGER = "common.ops";
+
+  /**
    * 配置文件中的服务注册根路径的key值
    */
   public static final String COMMON_ROOT = "common.root";
@@ -256,7 +261,7 @@ public class GlobalConstants {
     } else if ("consistent_hash".equalsIgnoreCase(strategy)) {
       ret = LB_STRATEGY.CONSISTENT_HASH;
     } else {
-      ret = LB_STRATEGY.ROUND_ROBIN;
+      ret = LB_STRATEGY.PICK_FIRST;
     }
     return ret;
   }
@@ -353,6 +358,11 @@ public class GlobalConstants {
     public static final String OWNER = "owner";
 
     /**
+     * 配置信息中“运作主管”的key值
+     */
+    public static final String OPERATION_MANAGER = "ops";
+
+    /**
      * 配置信息中“负载均衡算法”的key值
      */
     public static final String DEFAULT_LOADBALANCE = "default.loadbalance";
@@ -382,6 +392,11 @@ public class GlobalConstants {
      * 是否启用熔断机制
      */
     public static final String BREAKER_ENABLED = "common.breaker.enabled";
+
+    /**
+     * 是否启用参数路由功能
+     */
+    public static final String PARAMETER_ROUTER_ENABLED = "common.parameter.router.enabled";
 
     /**
      * 熔断机制统计周期
@@ -541,6 +556,11 @@ public class GlobalConstants {
 
       /** 客户端配置的GROUP的key值 */
       public static final String CONSUMER_GROUP_KEY = "invoke.group";
+
+      /**
+       * 客户端调用的服务端是主还是备，全局属性，不区分实例
+       */
+      public static final String CONSUMER_MASTER = "invoke.master";
     }
   }
 

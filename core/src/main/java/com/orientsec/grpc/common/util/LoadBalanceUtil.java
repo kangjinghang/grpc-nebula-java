@@ -59,6 +59,7 @@ public class LoadBalanceUtil {
    *
    * @Author yuanzhonglin
    * @since 2019/4/18
+   * @since 2020/06/22 modify by wlh 修改默认负载均衡策略为随机
    */
   public static GlobalConstants.LB_STRATEGY getLoadBalanceStrategy(Map<String, GlobalConstants.LB_STRATEGY> map,
                                                                    String method) {
@@ -71,7 +72,7 @@ public class LoadBalanceUtil {
       }
     }
     if (lb == null) {
-      lb = GlobalConstants.LB_STRATEGY.ROUND_ROBIN;
+      lb = GlobalConstants.LB_STRATEGY.PICK_FIRST;
     }
     return lb;
   }

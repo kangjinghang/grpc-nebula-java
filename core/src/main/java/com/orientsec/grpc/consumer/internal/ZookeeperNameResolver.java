@@ -22,28 +22,23 @@ import com.google.common.base.Preconditions;
 import com.orientsec.grpc.common.collect.ConcurrentHashSet;
 import com.orientsec.grpc.common.constant.GlobalConstants;
 import com.orientsec.grpc.common.constant.RegistryConstants;
+import com.orientsec.grpc.common.enums.LoadBalanceMode;
 import com.orientsec.grpc.common.resource.RegisterCenterConf;
 import com.orientsec.grpc.common.resource.SystemConfig;
-import com.orientsec.grpc.common.util.ConfigFileHelper;
-import com.orientsec.grpc.common.util.IpUtils;
-import com.orientsec.grpc.common.util.LoadBalanceUtil;
-import com.orientsec.grpc.common.util.MapUtils;
-import com.orientsec.grpc.common.util.StringUtils;
-import com.orientsec.grpc.common.util.ThreadUtils;
+import com.orientsec.grpc.common.util.*;
 import com.orientsec.grpc.consumer.FailoverUtils;
+import com.orientsec.grpc.consumer.ConfiguratorsRegistry;
+import com.orientsec.grpc.consumer.ParameterRouterUtil;
 import com.orientsec.grpc.consumer.check.CheckDeprecatedService;
 import com.orientsec.grpc.consumer.core.ConsumerServiceRegistry;
 import com.orientsec.grpc.consumer.model.ServiceProvider;
+import com.orientsec.grpc.consumer.routers.ParameterRouter;
 import com.orientsec.grpc.consumer.routers.Router;
 import com.orientsec.grpc.registry.common.URL;
 import com.orientsec.grpc.registry.common.utils.CollectionUtils;
 import com.orientsec.grpc.registry.common.utils.UrlUtils;
 import com.orientsec.grpc.registry.service.Consumer;
-import io.grpc.Attributes;
-import io.grpc.EquivalentAddressGroup;
-import io.grpc.ManagedChannel;
-import io.grpc.NameResolver;
-import io.grpc.Status;
+import io.grpc.*;
 import io.grpc.internal.SharedResourceHolder;
 import io.grpc.internal.SharedResourceHolder.Resource;
 import org.slf4j.Logger;
@@ -54,19 +49,8 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.UnknownHostException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
+import java.util.*;
+import java.util.concurrent.*;
 
 import static com.orientsec.grpc.common.constant.GlobalConstants.LB_STRATEGY;
 
@@ -116,6 +100,8 @@ public class ZookeeperNameResolver extends NameResolver {
   private volatile Map<String, LB_STRATEGY> loadBlanceStrategyMap = null;
 
   private volatile List<Router> routes = new ArrayList<>();
+  private volatile List<ParameterRouter> parameterRouters = new ArrayList<>();
+  private Map<String, ServiceProvider> lastProviderMapAfterParamRoute = new HashMap<>();
 
   private volatile URL zkRegistryURL;
   private volatile String subscribeId;//订阅id
@@ -129,6 +115,8 @@ public class ZookeeperNameResolver extends NameResolver {
 
   /** 是否手工指定了服务端地址列表 */
   private volatile boolean hasServiveServerList = false;
+  /** 客户端调用主服务器还是备服务器，true为调用主服务器，false为调用备服务器。默认调用主服务器 */
+  private volatile boolean invokeMaster = true;
 
   private volatile ScheduledExecutorService findZkExecutor = Executors.newScheduledThreadPool(1);;
   private volatile ScheduledFuture<?> findZkFuture;
@@ -739,30 +727,7 @@ public class ZookeeperNameResolver extends NameResolver {
         return;
       }
 
-      //----begin----判定是否打印告警日志、提示服务已经有新版本上线----
-
-      CheckDeprecatedService.check(serviceProviderMap);
-
-      //----end----判定是否打印告警日志、提示服务已经有新版本上线----
-
-      List<EquivalentAddressGroup> servers = new ArrayList<>();
-      InetAddress inetAddr;
-      InetSocketAddress inetSocketAddr;
-
-      for (Map.Entry<String, ServiceProvider> entry : serviceProviderMap.entrySet()) {
-        try {
-          inetAddr = InetAddress.getByName(entry.getValue().getHost());
-          inetSocketAddr = new InetSocketAddress(inetAddr, entry.getValue().getPort());
-          servers.add(new EquivalentAddressGroup(inetSocketAddr));
-        } catch (UnknownHostException e) {
-          logger.error("解析服务提供者IP地址出错", e);
-          // 应用过滤器之后，这里只剩下一个服务提供者了，所以出错后直接返回
-          savedListener.onError(Status.UNAVAILABLE.withCause(e));
-          return;
-        }
-      }
-
-      savedListener.onAddresses(servers, Attributes.EMPTY);
+      resolveAfterServiceProviderSelected(serviceProviderMap);
     } finally {
       resolving = false;
     }
@@ -893,6 +858,7 @@ public class ZookeeperNameResolver extends NameResolver {
 
     String version, key;
     boolean hasMaster = false;
+    boolean hasBackUp = false;
     ServiceProvider serviceProvider;
     Object masterObj, groupObj;
 
@@ -920,6 +886,8 @@ public class ZookeeperNameResolver extends NameResolver {
 
       if (serviceProvider.getMaster()) {
         hasMaster = true;
+      } else {
+        hasBackUp = true;
       }
 
       key = serviceProvider.getHost() + ":" + serviceProvider.getPort();
@@ -930,7 +898,7 @@ public class ZookeeperNameResolver extends NameResolver {
     resetAllProviders(allProviders);// 备份：当前服务接口的所有提供者
 
     // 根据master标志进行筛选
-    providers = chooseProvidersByMasterFlag(providers, hasMaster);
+    providers = chooseProvidersByMasterFlag(providers, hasMaster, hasBackUp);
 
     // 根据分组进行筛选
     providers = selectProvidersByGroup(providers);
@@ -943,29 +911,46 @@ public class ZookeeperNameResolver extends NameResolver {
   /**
    * 实现主备服务器自动切换
    * <p>
-   * 有主服务器的情况下，客户端只能调用主服务器；所有主服务器不可用时，客户端可以调用备服务器
+   * 根据invoke.master和有无主服务器筛选服务器列表
    * <p/>
    *
    * @author yulei
    * @since 2019/6/20
    * @since 2019/6/21 modify by sxp 微调
+   * @since 2020/5/25 modify by zhuyujie 增加invoke.master属性指定默认调用主服务器还是备服务器。
+   *                  有主服务器且invoke.master=true，则调用主服务器。
+   *                  有主服务器而invoke.master=false，则调用备服务器
+   *                  无主服务器而invoke.master=true，更改invoke.master属性为false，然后写入configurators，然后调用备服务器
+   *                  无主服务器且invoke.master=false，则调用备服务器。
    */
-  private static Map<String, ServiceProvider> chooseProvidersByMasterFlag(Map<String, ServiceProvider> providers, boolean hasMaster){
+  private Map<String, ServiceProvider> chooseProvidersByMasterFlag(Map<String, ServiceProvider> providers,
+                                                                   boolean hasMaster, boolean hasBackUp){
     ServiceProvider serviceProvider;
     Set<Map.Entry<String, ServiceProvider>> entrySet = providers.entrySet();
 
     Map<String, ServiceProvider> newProviders = new HashMap<>(MapUtils.capacity(providers.size()));
 
+    if (!hasMaster && hasBackUp && invokeMaster) {
+      final ConfiguratorsRegistry configuratorsRegistry = new ConfiguratorsRegistry(this);
+      // 使用新线程将invokeMaster=false写入configurators.成功写入后由listener修改invokeMaster属性。
+      new Thread(new Runnable() {
+        @Override
+        public void run() {
+          configuratorsRegistry.saveInvokeMasterConfig(false);
+        }
+      }, RegistryConstants.CONFIGURATION_REGISTRY_THREAD_NAME).start();
+    }
+
     for (Map.Entry<String, ServiceProvider> entry : entrySet) {
       serviceProvider = entry.getValue();
-      if (hasMaster) {
-        // 有主服务器的情况下，客户端只能调用主服务器
+      if (hasMaster && invokeMaster) {
         if (serviceProvider.getMaster()) {
           newProviders.put(entry.getKey(), serviceProvider);
         }
-      } else {
-        // 没有主服务器，说明所有服务器都是备服务器，无需判断，直接放入服务器列表
-        newProviders.put(entry.getKey(), serviceProvider);
+      } else if (hasBackUp && !invokeMaster) {
+        if (!serviceProvider.getMaster()) {
+          newProviders.put(entry.getKey(), serviceProvider);
+        }
       }
     }
 
@@ -1130,6 +1115,18 @@ public class ZookeeperNameResolver extends NameResolver {
     this.invokeGroup = invokeGroup;
   }
 
+  public boolean getInvokeMaster() {
+    return invokeMaster;
+  }
+
+  public void setInvokeMaster(boolean invokeMaster) {
+    this.invokeMaster = invokeMaster;
+  }
+
+  public URL getZkRegistryURL() {
+    return zkRegistryURL;
+  }
+
   @Override
   public String getServiceName() {
     return serviceName;
@@ -1156,6 +1153,18 @@ public class ZookeeperNameResolver extends NameResolver {
   @Override
   public Map<String, ServiceProvider> getAllProviders() {
     return allProviders;
+  }
+
+  public List<ParameterRouter> getParameterRouters() {
+    return parameterRouters;
+  }
+
+  public void setParameterRouters(List<ParameterRouter> parameterRouters) {
+    this.parameterRouters = parameterRouters;
+  }
+
+  public Map<String, ServiceProvider> getLastProviderMapAfterParamRoute() {
+    return lastProviderMapAfterParamRoute;
   }
 
   public void resetAllProviders(Map<String, ServiceProvider> allProviders) {
@@ -1293,6 +1302,14 @@ public class ZookeeperNameResolver extends NameResolver {
       return;
     }
 
+    resolveAfterServiceProviderSelected(serviceProviderMap);
+  }
+
+  /**
+   * 提取选择好serviceProvider以后的解析方法
+   */
+  private void resolveAfterServiceProviderSelected(Map<String, ServiceProvider> serviceProviderMap) {
+    Listener savedListener = listener;
     //----begin----判定是否打印告警日志、提示服务已经有新版本上线----
 
     CheckDeprecatedService.check(serviceProviderMap);
@@ -1326,7 +1343,11 @@ public class ZookeeperNameResolver extends NameResolver {
    * @since 2019/4/17
    */
   private void loadBalancer(String method) {
-    Preconditions.checkNotNull(providersForLoadBalance, "providersForLoadBalance");
+    loadBalancer(method, providersForLoadBalance);
+  }
+
+  private void loadBalancer(String method, Map<String, ServiceProvider> providerMap) {
+    Preconditions.checkNotNull(providerMap, "providersForLoadBalance");
 
     Object argument = this.listener.getArgument();
 
@@ -1334,7 +1355,60 @@ public class ZookeeperNameResolver extends NameResolver {
 
     // loadBlanceStrategy已经计算好了，直接拿过来使用
     serviceProviderMap = LoadBalancerFactory.getServiceProviderByLbStrategy(
-            lb, providersForLoadBalance, serviceName, argument);
+        lb, providerMap, serviceName, argument);
+  }
+
+  /**
+   * 根据传入的参数路由信息和现有的负载均衡策略，重新选择一个提供者
+   *
+   * @since nebula-1.2.8 2020-07-09
+   * @author zhuyujie
+   */
+  public boolean reselectProviderByParameterRouter(Map<String, Object> parameters, String method, Object argument) {
+    if (shutdown || listener == null) {
+      return false;
+    }
+    if (parameterRouters.isEmpty()) {
+      return false;
+    }
+
+    listener.setArgument(argument);
+    try {
+      if (!hasInitProvidersData) {
+        getAllByName(serviceName);
+      }
+
+      generateProvidersForLB();
+      if ((providersForLoadBalance.size() == 0)) {
+        // 此处不需抛出地址解析异常，直接返回即可，因为在后面还会以非参数路由的方式解析。
+        return false;
+      }
+
+      // 使用参数路由过滤
+      Map<String, ServiceProvider> providersAfterParamRoute = ParameterRouterUtil
+          .filterByParameterAndRule(providersForLoadBalance, parameterRouters, parameters, consumerUrl);
+
+      if (LoadBalanceMode.connection.name().equals(LoadBalanceUtil.getLoadBalanceMode(this, method))) {
+        // 连接负载均衡模式下，如果本次的结果与上次相同，则不再重新负载均衡、解析
+        if (providersAfterParamRoute.size() > 0 && providersAfterParamRoute.equals(lastProviderMapAfterParamRoute)) {
+          return true;
+        }
+      }
+      lastProviderMapAfterParamRoute = providersAfterParamRoute;
+
+      loadBalancer(method, providersAfterParamRoute);
+      providersCountAfterLoadBalance = serviceProviderMap.size();
+      if (serviceProviderMap.size() == 0) {
+        logger.info("存在可用的服务名称为["+ serviceName +"]的服务提供者，但是经过参数路由过滤后提供者列表为空！");
+        return true;
+      }
+    } catch (Exception e) {
+        logger.error("使用参数路由过滤服务端列表时出错," + e.getMessage(), e);
+        return false;
+    }
+
+    resolveAfterServiceProviderSelected(serviceProviderMap);
+    return true;
   }
 
   /**

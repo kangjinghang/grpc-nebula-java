@@ -163,11 +163,12 @@ public final class SystemConfig {
    *
    * @Author yuanzhonglin
    * @since 2019/4/15
+   * @since 2020/06/15 modify by wlh 修改默认负载均衡模式为请求负载均衡模式
    */
   private static void initLoadBalanceModeMap() {
-    // 默认为连接模式
-    String defalutValue = LoadBalanceMode.connection.name();
-    String mode = defalutValue;
+    // 默认为请求模式
+    String defaultValue = LoadBalanceMode.request.name();
+    String mode = defaultValue;
 
     String key = GlobalConstants.Consumer.Key.LOADBALANCE_MODE;
     if (properties != null && properties.containsKey(key)) {
@@ -176,7 +177,7 @@ public final class SystemConfig {
         mode = mode.trim();
         if (!mode.equals(LoadBalanceMode.connection.name())
                 && !mode.equals(LoadBalanceMode.request.name())) {
-          mode = defalutValue;
+          mode = defaultValue;
         }
       }
     }

@@ -80,6 +80,7 @@ public final class ConfigFileHelper {
     confFileCommonKeys.put(GlobalConstants.CommonKey.GRPC, Boolean.TRUE);
     confFileCommonKeys.put(GlobalConstants.CommonKey.PROJECT, Boolean.TRUE);
     confFileCommonKeys.put(GlobalConstants.CommonKey.OWNER, Boolean.TRUE);
+    confFileCommonKeys.put(GlobalConstants.CommonKey.OPERATION_MANAGER, Boolean.TRUE);
   }
 
   /**
@@ -104,14 +105,14 @@ public final class ConfigFileHelper {
     // ConfigFile pid = new ConfigFile("pid", DataType.LONG, true, ConfigFile.AUTO_VALUE);
 
     // 可选
-
+    ConfigFile ops = new ConfigFile("ops", DataType.STRING, false, null);
     ConfigFile module = new ConfigFile("module", DataType.STRING, false, null);
     ConfigFile group = new ConfigFile("group", DataType.STRING, false, null);
     ConfigFile timeout = new ConfigFile("default.timeout", DataType.INTEGER, false, "1000");
     ConfigFile reties = new ConfigFile("default.reties", DataType.INTEGER, false, "2");
     ConfigFile requests = new ConfigFile("default.requests", DataType.INTEGER, false, String.valueOf(GlobalConstants.Provider.DEFAULT_REQUESTS_NUM));
     ConfigFile connections = new ConfigFile("default.connections", DataType.INTEGER, false, String.valueOf(GlobalConstants.Provider.DEFAULT_CONNECTIONS_NUM));
-    ConfigFile loadbalance = new ConfigFile("default.loadbalance", DataType.STRING, false, "round_robin");
+    ConfigFile loadbalance = new ConfigFile("default.loadbalance", DataType.STRING, false, GlobalConstants.LB_STRATEGY.PICK_FIRST.getSimpleName());
     ConfigFile async = new ConfigFile("default.async", DataType.BOOLEAN, false, "false");
     ConfigFile token = new ConfigFile("token", DataType.STRING, false, "false");
     ConfigFile deprecated = new ConfigFile("deprecated", DataType.BOOLEAN, false, "false");
@@ -140,6 +141,7 @@ public final class ConfigFileHelper {
     // provider.add(timestamp);
     // provider.add(pid);
 
+    provider.add(ops);
     provider.add(module);
     provider.add(group);
     provider.add(timeout);
@@ -195,6 +197,7 @@ public final class ConfigFileHelper {
     // ConfigFile timestamp = new ConfigFile("timestamp", DataType.LONG, true, ConfigFile.AUTO_VALUE);
 
     // 可选
+    ConfigFile ops = new ConfigFile("ops", DataType.STRING, false, null);
     ConfigFile serviceVersion = new ConfigFile("service.version", DataType.STRING, false, null);
     ConfigFile applicationVersion = new ConfigFile("application.version", DataType.STRING, false, null);
     ConfigFile filter = new ConfigFile("default.reference.filter", DataType.STRING, false, null);
@@ -202,7 +205,7 @@ public final class ConfigFileHelper {
     ConfigFile organization = new ConfigFile("organization", DataType.STRING, false, null);
     ConfigFile pid = new ConfigFile("pid", DataType.LONG, false, null);
     ConfigFile retries = new ConfigFile("default.retries", DataType.LONG, false, "2");
-    ConfigFile loadbalance = new ConfigFile("default.loadbalance", DataType.STRING, false, "round_robin");
+    ConfigFile loadbalance = new ConfigFile("default.loadbalance", DataType.STRING, false, GlobalConstants.LB_STRATEGY.PICK_FIRST.getSimpleName());
     ConfigFile requests = new ConfigFile("default.requests", DataType.STRING, false, "0");
     ConfigFile connections = new ConfigFile("default.connections", DataType.STRING, false, "0");
     ConfigFile cluster = new ConfigFile("default.cluster", DataType.STRING, false, "failover");
@@ -217,6 +220,7 @@ public final class ConfigFileHelper {
     consumer.add(grpc);
     consumer.add(side);
     consumer.add(timeout);
+    consumer.add(ops);
     consumer.add(serviceVersion);
     consumer.add(applicationVersion);
     consumer.add(filter);

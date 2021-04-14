@@ -525,6 +525,9 @@ public class FailoverUtils {
             }
           }
         }
+      } else if (Status.Code.CANCELLED.equals(status.getCode())) {
+        // 被客户端主动取消的调用不计入错误提供者
+        return null;
       }
     }
 

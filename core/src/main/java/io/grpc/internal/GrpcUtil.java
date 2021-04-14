@@ -53,6 +53,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
 import java.util.Collection;
+import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -257,6 +258,12 @@ public final class GrpcUtil {
    */
   public static final CallOptions.Key<Boolean> CALL_OPTIONS_RPC_OWNED_BY_BALANCER =
       CallOptions.Key.create("io.grpc.internal.CALL_OPTIONS_RPC_OWNED_BY_BALANCER");
+
+  /**
+   * 请求中附带的参数路由规则KEY
+   */
+  public static final CallOptions.Key<Map<String, Object>> ROUTER_MAP_KEY =
+      CallOptions.Key.create("router-map");
 
   /**
    * Returns true if an RPC with the given properties should be counted when calculating the

@@ -255,6 +255,20 @@ public abstract class NameResolver {
     return false;
   }
 
+  /**
+   * 使用参数路由时，重新选择服务提供者
+   *
+   * @author zhuyujie
+   * @since 2020-7-8
+   */
+  public boolean reselectProviderByParameterRouter(Map<String, Object> parameters, String method, Object argument) {
+    return false;
+  }
+
+  public Map<String, ServiceProvider> getLastProviderMapAfterParamRoute() {
+    return null;
+  }
+
   public Map<String, ServiceProvider> getAllProviders() {
     return null;
   }

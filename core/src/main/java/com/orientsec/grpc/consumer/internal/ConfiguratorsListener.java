@@ -45,6 +45,7 @@ public class ConfiguratorsListener extends AbstractListener implements ConsumerL
   private ProviderMasterHandler masterHandler;
   private ProviderGroupHandler groupHandler;
   private ConsumerGroupHandler consumerGroupHandler;
+  private ConsumerMasterHander consumerMasterHander;
 
   public ConfiguratorsListener() {
   }
@@ -107,6 +108,11 @@ public class ConfiguratorsListener extends AbstractListener implements ConsumerL
       consumerGroupHandler = new ConsumerGroupHandler(zookeeperNameResolver);
     }
     consumerGroupHandler.notify(urls);
+
+    if (consumerMasterHander == null) {
+      consumerMasterHander = new ConsumerMasterHander(zookeeperNameResolver);
+    }
+    consumerMasterHander.notify(urls);
 
   }
 }
