@@ -65,6 +65,7 @@ import java.net.SocketAddress;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -72,6 +73,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.google.common.base.Charsets.UTF_8;
 import static com.google.common.truth.Truth.assertThat;
@@ -2030,6 +2032,11 @@ public abstract class AbstractTransportTest {
 
     @Override
     public Collection<ServerTransport> getTransports() { return null; }
+
+    @Override
+    public Map<String, AtomicInteger> getIpCountMap() {
+      return null;
+    }
   }
 
   private static class MockServerTransportListener implements ServerTransportListener {

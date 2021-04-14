@@ -17,6 +17,8 @@
 package io.grpc.internal;
 
 import java.util.Collection;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * A listener to a server for transport creation events. The listener need not be thread-safe, so
@@ -55,4 +57,13 @@ public interface ServerListener {
    * @since 2019/12/03
    */
   Collection<ServerTransport> getTransports();
+
+  /**
+   * 获取IP连接计数Map
+   *
+   * @return
+   * @author wlh
+   * @since nebula-1.2.6
+   */
+  Map<String, AtomicInteger> getIpCountMap();
 }

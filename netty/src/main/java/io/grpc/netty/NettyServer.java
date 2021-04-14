@@ -57,6 +57,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static io.grpc.netty.NettyServerBuilder.MAX_CONNECTION_AGE_NANOS_DISABLED;
@@ -186,16 +187,19 @@ class NettyServer implements InternalServer, InternalWithLogId {
         String remoteAddr = ch.remoteAddress().toString();
         int maxConnetions = SystemConfig.getProviderMaxConnetions(); // 最大连接数
 
-        String ipAddr = getIpAddr(remoteAddr);
+        final String ipAddr = getIpAddr(remoteAddr);
         if (maxConnetions > 0) {
-          // int currentConnetions = listener.getServerTransportCount();// 当前连接数
-          int currentConnetions = getTransportCountByIp(listener.getTransports(), ipAddr);
-          if (currentConnetions >= maxConnetions) {
-            synchronized (NettyServer.this) {
-              LOGGER.warn("当前客户端IP:{} 连接数超配置上限，上限{}，当前连接数{}", ipAddr, maxConnetions, currentConnetions);
-              // 关闭channel，使客户端能立即捕捉到异常
-              ch.close();
-              return;
+          // 获取当前IP连接数
+          AtomicInteger atomicInteger = listener.getIpCountMap().get(ipAddr);
+          if (atomicInteger != null && atomicInteger.get() > 0) {
+            int currentConnetions = atomicInteger.get();
+            if (currentConnetions >= maxConnetions) {
+              synchronized (NettyServer.this) {
+                LOGGER.warn("当前客户端IP:{} 连接数超配置上限，上限{}，当前连接数{}", ipAddr, maxConnetions, currentConnetions);
+                // 关闭channel，使客户端能立即捕捉到异常
+                ch.close();
+                return;
+              }
             }
           }
         }
@@ -241,6 +245,14 @@ class NettyServer implements InternalServer, InternalWithLogId {
           // inside the lock.
           eventLoopReferenceCounter.retain();
           transportListener = listener.transportCreated(transport);
+
+          // Transport创建，统计IP连接数量
+          Map<String, AtomicInteger> ipCountMap = listener.getIpCountMap();
+          if (ipCountMap.containsKey(ipAddr)) {
+            ipCountMap.get(ipAddr).incrementAndGet();
+          } else {
+            ipCountMap.put(ipAddr, new AtomicInteger(1));
+          }
         }
 
         /**
@@ -254,6 +266,12 @@ class NettyServer implements InternalServer, InternalWithLogId {
             if (!done) {
               done = true;
               eventLoopReferenceCounter.release();
+
+              // 移除当前IP服务连接统计信息
+              AtomicInteger atomicInteger = listener.getIpCountMap().get(ipAddr);
+              if (atomicInteger != null && atomicInteger.get() > 0) {
+                atomicInteger.decrementAndGet();
+              }
             }
           }
         }

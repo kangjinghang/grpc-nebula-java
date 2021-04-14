@@ -75,6 +75,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.google.common.base.Charsets.UTF_8;
 import static com.google.common.truth.Truth.assertThat;
@@ -800,6 +801,11 @@ public class NettyClientTransportTest {
 
     @Override
     public Collection<ServerTransport> getTransports() { return null; }
+
+    @Override
+    public Map<String, AtomicInteger> getIpCountMap() {
+      return null;
+    }
   }
 
   private static final class StringMarshaller implements Marshaller<String> {

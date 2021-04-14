@@ -38,7 +38,7 @@ public class ProvidersListener extends AbstractListener implements ConsumerListe
   private static final Logger logger = LoggerFactory.getLogger(ProvidersListener.class);
   private boolean initData;
   private boolean isProviderListEmpty = true;
-  private static Set<String> previousHostPorts = new HashSet<>();
+  private Set<String> previousHostPorts = new HashSet<>();
 
   public ProvidersListener() {
     initData = true;

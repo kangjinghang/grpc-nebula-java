@@ -23,7 +23,7 @@ package com.orientsec.grpc.common;
  * @since V1.0 2017/5/23
  */
 public class OrientsecGrpcVersion {
-  private static final String DEFAULT_VERSION = "1.2.6";// 默认版本号
+  private static final String DEFAULT_VERSION = "1.2.7";// 默认版本号
   /**
    * 版本号
    */

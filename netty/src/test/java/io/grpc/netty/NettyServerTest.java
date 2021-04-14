@@ -93,6 +93,11 @@ public class NettyServerTest {
 
       @Override
       public Collection<ServerTransport> getTransports() {return null;}
+
+      @Override
+      public Map<String, AtomicInteger> getIpCountMap() {
+        return null;
+      }
     });
 
     // Check that we got an actual port.
@@ -187,6 +192,11 @@ public class NettyServerTest {
       public Collection<ServerTransport> getTransports() {
         return null;
       }
+
+      @Override
+      public Map<String, AtomicInteger> getIpCountMap() {
+        return null;
+      }
     });
 
     Socket socket = new Socket();
@@ -240,6 +250,11 @@ public class NettyServerTest {
 
       @Override
       public Collection<ServerTransport> getTransports() {
+        return null;
+      }
+
+      @Override
+      public Map<String, AtomicInteger> getIpCountMap() {
         return null;
       }
     });

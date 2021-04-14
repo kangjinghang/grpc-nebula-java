@@ -29,7 +29,9 @@ import org.junit.runners.JUnit4;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @RunWith(JUnit4.class)
 public class InProcessServerTest {
@@ -81,6 +83,11 @@ public class InProcessServerTest {
 
       @Override
       public Collection<ServerTransport> getTransports() { return null; }
+
+      @Override
+      public Map<String, AtomicInteger> getIpCountMap() {
+        return null;
+      }
     });
     Truth.assertThat(pool.count).isEqualTo(1);
     s.shutdown();
