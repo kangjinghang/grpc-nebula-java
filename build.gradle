@@ -1,14 +1,15 @@
 buildscript {
     repositories {
         mavenLocal()
+        maven { url 'https://maven.aliyun.com/repository/public/' }
         mavenCentral()
         maven { url "https://plugins.gradle.org/m2/" }
-        maven { url INTRANET_MAVEN_URL
-            credentials {
-                username INTRANET_MAVEN_USERNAME
-                password INTRANET_MAVEN_PASSWORD
-            }
-        }
+//        maven { url INTRANET_MAVEN_URL
+//            credentials {
+//                username INTRANET_MAVEN_USERNAME
+//                password INTRANET_MAVEN_PASSWORD
+//            }
+//        }
     }
     dependencies {
         classpath "com.diffplug.spotless:spotless-plugin-gradle:3.13.0"
@@ -66,12 +67,12 @@ subprojects {
     repositories {
         mavenLocal()
         mavenCentral()
-        maven { url INTRANET_MAVEN_URL
-            credentials {
-                username INTRANET_MAVEN_USERNAME
-                password INTRANET_MAVEN_PASSWORD
-            }
-        }
+//        maven { url INTRANET_MAVEN_URL
+//            credentials {
+//                username INTRANET_MAVEN_USERNAME
+//                password INTRANET_MAVEN_PASSWORD
+//            }
+//        }
     }
 
     [
@@ -217,7 +218,8 @@ subprojects {
             google_auth_credentials: 'com.google.auth:google-auth-library-credentials:0.9.0',
             google_auth_oauth2_http: 'com.google.auth:google-auth-library-oauth2-http:0.9.0',
             okhttp: 'com.squareup.okhttp:okhttp:2.5.0',
-            okio: 'com.squareup.okio:okio:1.13.0',
+//            okio: 'com.squareup.okio:okio:1.13.0',
+            okio: 'com.squareup.okio:okio:1.6.0',
             opencensus_api: "io.opencensus:opencensus-api:${opencensusVersion}",
             opencensus_contrib_grpc_metrics: "io.opencensus:opencensus-contrib-grpc-metrics:${opencensusVersion}",
             opencensus_impl: "io.opencensus:opencensus-impl:${opencensusVersion}",
